@@ -1,0 +1,61 @@
+# sentinel-api.yaml — Sentinel-API v2.4.1 configuration
+# All values are overridable with CLI flags; flags always win.
+
+# ---------------------------------------------------------------------------
+# Target
+# ---------------------------------------------------------------------------
+target: ""
+openapi_spec_url: ""
+
+# ---------------------------------------------------------------------------
+# Performance
+# ---------------------------------------------------------------------------
+concurrency: 25
+rate_limit_rps: 50
+timeout: 10s
+follow_redirects: true
+
+# ---------------------------------------------------------------------------
+# Authentication
+# ---------------------------------------------------------------------------
+bearer_token: ""
+api_key: ""
+user_agent: ""
+
+# ---------------------------------------------------------------------------
+# Wordlist
+# ---------------------------------------------------------------------------
+wordlist_path: ""
+
+# ---------------------------------------------------------------------------
+# Scan modules
+# ---------------------------------------------------------------------------
+scan_modes:
+  discovery:     true
+  owasp:         true
+  rate_limit:    true
+  pii_detection: true
+  shadow_api:    true
+  fuzzing:       false
+  cve_lookup:    false   # Set true to enable live NVD API 2.0 lookup
+
+# ---------------------------------------------------------------------------
+# NVD API (live CVE lookup)
+# ---------------------------------------------------------------------------
+# nvd_api_key:   ""       # Free key from https://nvd.nist.gov/developers/request-an-api-key
+#                         # Without key: 5 req/30s  |  With key: 50 req/30s
+# nvd_timeout:   15s      # Per-request timeout to services.nvd.nist.gov
+# nvd_cache_ttl: 24h      # In-memory cache TTL — avoids re-querying within a scan session
+# nvd_offline:   false    # Set true for air-gapped environments (uses static fallback table)
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+output_path: "./reports"
+
+# ---------------------------------------------------------------------------
+# AI Backend
+# ---------------------------------------------------------------------------
+ai_backend_url: "http://localhost:8000"
+# Use grpc:// prefix for gRPC transport:
+# ai_backend_url: "grpc://localhost:50051"
