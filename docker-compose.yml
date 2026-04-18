@@ -1,0 +1,123 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Sentinel-API — Production Stack v2.4.1
+#
+#  Services:
+#    scanner   Go enumeration engine (run-and-exit, triggered on demand)
+#    ai        Python FastAPI + gRPC — LLM intelligence layer
+#    ui        HTMX + Tailwind dashboard (FastAPI/Jinja2)
+#
+#  Ports:
+#    3000  UI Dashboard
+#    8000  AI HTTP backend
+#   50051  AI gRPC endpoint
+#
+#  Transport:
+#    scanner → ai   grpc://ai:50051  (real-time events + batch enrichment)
+#    scanner → ai   http://ai:8000   (fallback, external CI/CD use)
+#    ui      → ai   http://ai:8000   (proxied API calls)
+#    browser → ui   ws://ui:3000/ws/scan/{id}  (scan event stream proxy)
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Go Scanner Engine (run-and-exit)
+  # ---------------------------------------------------------------------------
+  scanner:
+    build:
+      context: ./scanner
+      dockerfile: Dockerfile
+    image: sentinel-api/scanner:2.4.1
+    container_name: sentinel-scanner
+    restart: "no"
+    environment:
+      - SENTINEL_TARGET=${SENTINEL_TARGET:-}
+      - SENTINEL_TOKEN=${SENTINEL_TOKEN:-}
+      - SENTINEL_AI_BACKEND=${SENTINEL_AI_BACKEND:-grpc://ai:50051}
+      - SENTINEL_NVD_KEY=${SENTINEL_NVD_KEY:-}
+    volumes:
+      - ./reports:/reports
+      - ./wordlists:/wordlists:ro
+    networks:
+      - sentinel-net
+    depends_on:
+      ai:
+        condition: service_healthy
+    command: ["scan", "--help"]
+
+  # ---------------------------------------------------------------------------
+  # Python AI / Intelligence Layer
+  # ---------------------------------------------------------------------------
+  ai:
+    build:
+      context: .
+      dockerfile: ai/Dockerfile
+    image: sentinel-api/ai:2.4.1
+    container_name: sentinel-ai
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+      - "50051:50051"
+    environment:
+      - MODEL_PATH=/models/mistral-7b-instruct-v0.2.Q4_K_M.gguf
+      - DB_PATH=/data/sentinel.db
+      - LOG_LEVEL=INFO
+      - ENVIRONMENT=production
+      - GRPC_PORT=50051
+      - HTTP_PORT=8000
+      - API_KEY=${SENTINEL_API_KEY:-}
+      - MODEL_N_GPU_LAYERS=${MODEL_N_GPU_LAYERS:-0}
+      - MODEL_N_THREADS=${MODEL_N_THREADS:-8}
+    volumes:
+      - ./models:/models:ro
+      - sentinel-db:/data
+    networks:
+      - sentinel-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  # ---------------------------------------------------------------------------
+  # HTMX Dashboard (Python/Jinja2 SSR)
+  # ---------------------------------------------------------------------------
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    image: sentinel-api/ui:2.4.1
+    container_name: sentinel-ui
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - AI_BACKEND_URL=http://ai:8000
+      - AI_API_KEY=${SENTINEL_API_KEY:-}
+      - PORT=3000
+      - DEBUG=false
+    volumes:
+      # Mount reports dir so the UI server can read sentinel_*.json files
+      - ./reports:/reports:ro
+    networks:
+      - sentinel-net
+    depends_on:
+      ai:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+# ---------------------------------------------------------------------------
+networks:
+  sentinel-net:
+    driver: bridge
+
+volumes:
+  sentinel-db:
+    driver: local
