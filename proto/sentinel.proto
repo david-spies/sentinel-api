@@ -1,0 +1,169 @@
+syntax = "proto3";
+
+package sentinel;
+
+option go_package = "github.com/sentinel-api/scanner/internal/grpc/sentinelpb";
+option python_out = "ai/grpc";
+
+// ---------------------------------------------------------------------------
+//  SentinelAI — gRPC service for low-latency Go scanner ↔ Python AI bridge
+//
+//  Design principles:
+//    - AnalyzeFindings: unary RPC for full batch remediation (replaces HTTP POST)
+//    - StreamScanEvents: server-streaming RPC so the Go orchestrator can push
+//      scan events to any connected dashboard subscriber in real time
+//    - ScoreFinding: unary RPC for single-finding on-demand rescoring
+//    - GetHistory: unary RPC for DuckDB trend data used by the dashboard
+// ---------------------------------------------------------------------------
+
+service SentinelAI {
+
+  // AnalyzeFindings accepts a batch of scanner findings and returns AI-generated
+  // remediation guidance for each. Replaces the HTTP POST /analyze-findings route
+  // for internal Go→Python calls; the HTTP route remains for external integrations.
+  rpc AnalyzeFindings(AnalyzeFindingsRequest) returns (AnalyzeFindingsResponse);
+
+  // StreamScanEvents opens a server-side stream. The Go orchestrator calls this
+  // once per scan run and pushes ScanEvent messages as they are emitted. The
+  // Python layer fans these out to connected WebSocket dashboard clients.
+  rpc StreamScanEvents(stream ScanEvent) returns (StreamAck);
+
+  // ScoreFinding rescores a single finding using the Python SentinelRank engine.
+  // Used by the dashboard "rescore" button after a user updates context tags.
+  rpc ScoreFinding(ScoreFindingRequest) returns (ScoreFindingResponse);
+
+  // GetScanHistory returns paginated ScanHistoryEntry records from DuckDB
+  // for a given target, used by the dashboard trend chart.
+  rpc GetScanHistory(HistoryRequest) returns (HistoryResponse);
+
+  // Health returns service liveness and model-load status.
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+// ---------------------------------------------------------------------------
+// AnalyzeFindings
+// ---------------------------------------------------------------------------
+
+message AnalyzeFindingsRequest {
+  string scan_id  = 1;
+  string target   = 2;
+  repeated Finding findings = 3;
+}
+
+message AnalyzeFindingsResponse {
+  repeated RemediatedFinding findings = 1;
+  int32  findings_enriched = 2;
+  string model_used        = 3; // e.g. "mistral-7b-instruct-v0.2.Q4_K_M"
+  double inference_ms      = 4;
+}
+
+message RemediatedFinding {
+  string id          = 1;
+  string remediation = 2;
+  string priority    = 3; // IMMEDIATE | SHORT_TERM | LONG_TERM
+  string code_snippet = 4;
+  double cvss_score  = 5; // AI-adjusted CVSS (may differ from scanner value)
+  int32  risk_score  = 6; // SentinelRank rescored by Python engine
+}
+
+// ---------------------------------------------------------------------------
+// StreamScanEvents
+// ---------------------------------------------------------------------------
+
+message ScanEvent {
+  string scan_id  = 1;
+  string phase    = 2; // fingerprint | discovery | analysis | reporting | complete
+  string message  = 3;
+  int32  done     = 4;
+  int32  total    = 5;
+  int64  ts_ms    = 6; // Unix milliseconds
+  string severity = 7; // INFO | WARN | ERROR (optional)
+}
+
+message StreamAck {
+  string scan_id        = 1;
+  int32  events_received = 2;
+}
+
+// ---------------------------------------------------------------------------
+// ScoreFinding
+// ---------------------------------------------------------------------------
+
+message ScoreFindingRequest {
+  Finding finding = 1;
+}
+
+message ScoreFindingResponse {
+  int32  risk_score    = 1;
+  string severity      = 2;
+  string justification = 3; // LLM-generated explanation of the score
+}
+
+// ---------------------------------------------------------------------------
+// GetScanHistory
+// ---------------------------------------------------------------------------
+
+message HistoryRequest {
+  string target     = 1;
+  int32  limit      = 2; // default 20
+  int32  offset     = 3;
+}
+
+message HistoryResponse {
+  repeated ScanHistoryEntry entries = 1;
+  int32 total = 2;
+}
+
+message ScanHistoryEntry {
+  string scan_id         = 1;
+  string target          = 2;
+  string scanned_at      = 3; // RFC3339
+  string duration        = 4;
+  int32  sentinel_score  = 5;
+  int32  critical_count  = 6;
+  int32  high_count      = 7;
+  int32  medium_count    = 8;
+  int32  endpoint_count  = 9;
+  int32  shadow_count    = 10;
+}
+
+// ---------------------------------------------------------------------------
+// Health
+// ---------------------------------------------------------------------------
+
+message HealthRequest {}
+
+message HealthResponse {
+  string status       = 1; // ok | degraded | starting
+  bool   model_loaded = 2;
+  string model_name   = 3;
+  double uptime_s     = 4;
+  string version      = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Shared Finding message (mirrors models.Finding in Go)
+// ---------------------------------------------------------------------------
+
+message Finding {
+  string   id           = 1;
+  string   severity     = 2; // CRITICAL | HIGH | MEDIUM | LOW | INFO
+  string   owasp        = 3; // e.g. "API1:2023 - Broken Object Level Authorization"
+  string   title        = 4;
+  string   description  = 5;
+  string   evidence     = 6;
+  double   cvss_score   = 7;
+  int32    risk_score   = 8;
+  repeated string tags  = 9;
+  Endpoint endpoint     = 10;
+}
+
+message Endpoint {
+  string path          = 1;
+  string method        = 2;
+  bool   auth_required = 3;
+  string auth_type     = 4;
+  bool   has_rate_limit = 5;
+  string status        = 6; // DOCUMENTED | UNDOCUMENTED | ZOMBIE | INTERNAL
+  int32  status_code   = 7;
+}
