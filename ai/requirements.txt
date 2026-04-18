@@ -1,0 +1,14 @@
+# Sentinel-API UI Server — Python dependencies
+# Lightweight server-side rendering layer for the HTMX dashboard
+
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+jinja2==3.1.4
+python-multipart==0.0.9
+httpx==0.27.0        # Async HTTP client — proxies AI backend calls
+pydantic==2.7.1
+pydantic-settings==2.2.1
+structlog==24.1.0
+orjson==3.10.3
+anyio==4.3.0
+websockets==12.0     # WebSocket proxying for scan event stream
