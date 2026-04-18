@@ -1,0 +1,73 @@
+<!-- Tech stack header card — replaces skeleton on results page -->
+{% set score = tech.get('sentinel_rank_score', 0) if tech else 0 %}
+<div class="bg-sentinel-card border border-sentinel-border rounded-lg mb-4">
+  <div class="p-4 flex flex-wrap gap-4 items-start">
+
+    <!-- Score ring -->
+    <div class="flex flex-col items-center justify-center w-28 flex-shrink-0">
+      <div class="relative w-20 h-20">
+        <svg class="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+          <circle cx="40" cy="40" r="32" fill="none" stroke="#1c2538" stroke-width="7"/>
+          <circle cx="40" cy="40" r="32" fill="none"
+                  stroke="{% if score >= 80 %}#34d399{% elif score >= 60 %}#fbbf24{% else %}#f87171{% endif %}"
+                  stroke-width="7"
+                  stroke-dasharray="201"
+                  stroke-dashoffset="{{ 201 - (201 * score // 100) }}"
+                  stroke-linecap="round"/>
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+          <span class="text-xl font-black
+            {% if score >= 80 %}text-green-400{% elif score >= 60 %}text-amber-400{% else %}text-red-400{% endif %}">
+            {{ score }}
+          </span>
+          <span class="text-[9px] font-mono text-sentinel-muted leading-none">/100</span>
+        </div>
+      </div>
+      <div class="text-[9px] font-mono text-sentinel-muted mt-1 text-center leading-tight">SentinelRank™</div>
+    </div>
+
+    <!-- Tech fields -->
+    <div class="flex-1 grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 min-w-0">
+      {% set fields = [
+        ('Server', tech.server),
+        ('Language', tech.language),
+        ('Framework', tech.framework),
+        ('WAF', tech.waf),
+        ('API Gateway', tech.api_gateway),
+        ('TLS', tech.tls_version),
+      ] %}
+      {% for label, value in fields %}
+      <div>
+        <div class="text-[9px] font-mono text-sentinel-dim uppercase tracking-widest">{{ label }}</div>
+        <div class="text-xs font-mono text-gray-200 truncate mt-0.5">{{ value or '—' }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- CVE pill -->
+    {% set cve_count = tech.cves | length if tech.cves else 0 %}
+    {% if cve_count > 0 %}
+    {% set exploited = tech.cves | selectattr('exploited') | list | length %}
+    <div class="flex-shrink-0 text-center">
+      <div class="text-[9px] font-mono text-sentinel-dim uppercase tracking-widest mb-1">CVEs (NVD)</div>
+      <div class="text-2xl font-black {% if exploited > 0 %}text-red-400{% else %}text-amber-400{% endif %}">
+        {{ cve_count }}
+      </div>
+      {% if exploited > 0 %}
+      <div class="text-[10px] font-mono text-red-400 mt-0.5">{{ exploited }} KEV ⚠</div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- CVE ID strip -->
+  {% if tech.cve_ids %}
+  <div class="px-4 pb-3 flex flex-wrap gap-1.5">
+    {% for cid in tech.cve_ids %}
+    <span class="font-mono text-[10px] px-2 py-0.5 rounded bg-red-900/30 text-red-400 border border-red-900/40">
+      {{ cid }}
+    </span>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

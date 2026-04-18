@@ -1,0 +1,59 @@
+{% if not shadows %}
+<div class="text-center py-10 text-sentinel-muted text-sm">
+  <div class="text-2xl mb-2 text-green-400">✓</div>
+  No shadow or zombie APIs detected.
+  {% if not openapi_provided %}
+  <div class="mt-2 text-xs font-mono text-sentinel-dim">
+    Pass <span class="text-blue-400">--openapi</span> for schema-diff detection in addition to heuristic matching.
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="mb-3 flex items-center gap-3 flex-wrap">
+  <span class="text-xs text-sentinel-muted font-mono">{{ shadows | length }} undocumented endpoints</span>
+  {% set new_count = shadows | selectattr('endpoint_status', 'equalto', 'UNDOCUMENTED') | list | length %}
+  {% set zombie_count = shadows | selectattr('endpoint_status', 'equalto', 'ZOMBIE') | list | length %}
+  {% set internal_count = shadows | selectattr('endpoint_status', 'equalto', 'INTERNAL') | list | length %}
+  {% if new_count %}<span class="text-[11px] font-mono px-2 py-0.5 rounded bg-red-900/40 text-red-400">{{ new_count }} Shadow</span>{% endif %}
+  {% if zombie_count %}<span class="text-[11px] font-mono px-2 py-0.5 rounded bg-purple-900/40 text-purple-400">{{ zombie_count }} Zombie</span>{% endif %}
+  {% if internal_count %}<span class="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-900/40 text-amber-400">{{ internal_count }} Internal</span>{% endif %}
+</div>
+
+<div class="rounded-lg border border-sentinel-border overflow-hidden">
+  {% for ep in shadows %}
+  {% set status_cls = {
+    'UNDOCUMENTED': ('bg-red-900/40 text-red-400', 'Shadow', 'bg-red-900/10'),
+    'ZOMBIE': ('bg-purple-900/40 text-purple-400', 'Zombie', 'bg-purple-900/10'),
+    'INTERNAL': ('bg-amber-900/40 text-amber-400', 'Internal', 'bg-amber-900/10'),
+  } %}
+  {% set pill_cls, label, row_bg = status_cls.get(ep.endpoint_status, ('bg-gray-800 text-gray-400', ep.endpoint_status, '')) %}
+  <div class="flex items-center gap-3 px-4 py-3 border-b border-sentinel-border last:border-b-0 {{ row_bg }} font-mono text-xs hover:bg-sentinel-border/20">
+    <!-- Status badge -->
+    <span class="text-[10px] font-bold px-2 py-0.5 rounded {{ pill_cls }} flex-shrink-0 w-20 text-center">
+      {{ label }}
+    </span>
+
+    <!-- Method -->
+    {% set m_cls = {'GET': 'text-green-400', 'POST': 'text-blue-400', 'PUT': 'text-amber-400', 'DELETE': 'text-red-400', 'PATCH': 'text-purple-400'} %}
+    <span class="w-14 text-center font-bold {{ m_cls.get(ep.method, 'text-gray-400') }}">{{ ep.method }}</span>
+
+    <!-- Path -->
+    <span class="text-gray-200 flex-1 truncate">{{ ep.path }}</span>
+
+    <!-- Auth -->
+    <span class="{% if not ep.auth_required %}text-red-400{% else %}text-sentinel-muted{% endif %} w-20 text-right hidden sm:block">
+      {{ 'No auth' if not ep.auth_required else (ep.auth_type or 'Auth') }}
+    </span>
+
+    <!-- Risk score -->
+    <span class="w-12 text-right font-bold
+      {% if ep.risk_score >= 80 %}text-red-400
+      {% elif ep.risk_score >= 60 %}text-amber-400
+      {% elif ep.risk_score > 0 %}text-purple-400
+      {% else %}text-sentinel-muted{% endif %}">
+      {% if ep.risk_score > 0 %}{{ ep.risk_score }}{% else %}—{% endif %}
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

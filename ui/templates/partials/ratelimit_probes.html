@@ -1,0 +1,83 @@
+{% if not probes %}
+<div class="text-center py-10 text-sentinel-muted text-sm">
+  <div class="text-2xl mb-2">◎</div>
+  Rate-limit testing was not run or produced no probes.
+  <div class="mt-2 text-xs font-mono text-sentinel-dim">
+    Enabled by default. Disable with <span class="text-blue-400">--no-rate-test</span>.
+  </div>
+</div>
+{% else %}
+<div class="mb-3 flex items-center gap-3 flex-wrap">
+  {% set total = probes | length %}
+  {% set limited = probes | selectattr('rate_limited') | list | length %}
+  {% set recursive = probes | selectattr('recursive_query_risk') | list | length %}
+  <span class="text-xs text-sentinel-muted font-mono">{{ total }} endpoints probed · 5 warmup + 50 burst requests each</span>
+  {% if recursive %}<span class="text-[11px] font-mono px-2 py-0.5 rounded bg-red-900/40 text-red-400 animate-pulse">{{ recursive }} RecursiveRisk</span>{% endif %}
+  {% if limited %}<span class="text-[11px] font-mono px-2 py-0.5 rounded bg-green-900/40 text-green-400">{{ limited }} rate-limited</span>{% endif %}
+</div>
+
+<div class="rounded-lg border border-sentinel-border overflow-hidden">
+  <table class="w-full text-xs font-mono">
+    <thead>
+      <tr class="border-b border-sentinel-border bg-sentinel-surface/50">
+        <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Endpoint</th>
+        <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">429?</th>
+        <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Base TTFB</th>
+        <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Burst TTFB</th>
+        <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Degradation</th>
+        <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in probes %}
+      {% set ep = p.endpoint %}
+      {% set degradation = p.ttfb_degradation_pct | float %}
+      {% set base_ms = (p.base_ttfb_ms // 1000000) if p.base_ttfb_ms else 0 %}
+      {% set burst_ms = (p.burst_ttfb_ms // 1000000) if p.burst_ttfb_ms else 0 %}
+      <tr class="border-b border-sentinel-border last:border-b-0 hover:bg-sentinel-border/20
+                 {% if p.recursive_query_risk %}bg-red-900/5{% endif %}">
+        <td class="px-4 py-3 text-gray-200 max-w-[220px]">
+          <span class="{% if ep %}{{ {'GET': 'text-green-400', 'POST': 'text-blue-400', 'PUT': 'text-amber-400', 'DELETE': 'text-red-400'}.get(ep.method, 'text-gray-400') }}{% endif %} mr-1.5">
+            {{ ep.method if ep else '?' }}
+          </span>
+          <span class="truncate">{{ ep.path if ep else '—' }}</span>
+        </td>
+        <td class="px-4 py-3 {% if p.rate_limited %}text-green-400{% else %}text-red-400{% endif %}">
+          {{ 'Yes' if p.rate_limited else 'No' }}
+        </td>
+        <td class="px-4 py-3 text-blue-400">{{ base_ms }}ms</td>
+        <td class="px-4 py-3 {% if burst_ms > base_ms * 2 %}text-red-400{% elif burst_ms > base_ms * 1.5 %}text-amber-400{% else %}text-blue-400{% endif %}">
+          {{ burst_ms }}ms
+        </td>
+        <td class="px-4 py-3">
+          <div class="flex items-center gap-2">
+            <!-- Mini bar -->
+            <div class="w-16 bg-sentinel-border rounded-full h-1.5 overflow-hidden">
+              <div class="h-1.5 rounded-full
+                {% if degradation > 200 %}bg-red-500
+                {% elif degradation > 50 %}bg-amber-500
+                {% else %}bg-green-500{% endif %}"
+                style="width: {{ [degradation, 100] | min | int }}%"></div>
+            </div>
+            <span class="{% if degradation > 200 %}text-red-400{% elif degradation > 50 %}text-amber-400{% else %}text-green-400{% endif %}">
+              +{{ degradation | int }}%
+            </span>
+          </div>
+        </td>
+        <td class="px-4 py-3">
+          {% if p.recursive_query_risk %}
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-900/40 text-red-400">RecursiveRisk</span>
+          {% elif p.server_crashed %}
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-red-900/40 text-red-400">Crashed</span>
+          {% elif p.rate_limited %}
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-green-900/40 text-green-400">Rate Limited ✓</span>
+          {% else %}
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-900/40 text-amber-400">Unprotected</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

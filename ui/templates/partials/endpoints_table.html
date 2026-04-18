@@ -1,0 +1,84 @@
+{% set method_cls = {
+  'GET': 'bg-green-900/30 text-green-400',
+  'POST': 'bg-blue-900/30 text-blue-400',
+  'PUT': 'bg-amber-900/30 text-amber-400',
+  'DELETE': 'bg-red-900/30 text-red-400',
+  'PATCH': 'bg-purple-900/30 text-purple-400',
+  'HEAD': 'bg-gray-800 text-gray-400',
+  'OPTIONS': 'bg-gray-800 text-gray-400',
+} %}
+{% set status_cls = {
+  'DOCUMENTED': 'bg-green-900/30 text-green-400',
+  'UNDOCUMENTED': 'bg-red-900/30 text-red-400',
+  'ZOMBIE': 'bg-purple-900/30 text-purple-400',
+  'INTERNAL': 'bg-amber-900/30 text-amber-400',
+} %}
+
+<!-- Filter chips -->
+<div class="flex gap-2 flex-wrap mb-3">
+  {% for f_val, f_label in [('all','All'),('DOCUMENTED','Documented'),('UNDOCUMENTED','Shadow'),('ZOMBIE','Zombie'),('INTERNAL','Internal')] %}
+  <button hx-get="/partials/endpoints/{{ scan_id }}?filter={{ f_val }}"
+          hx-target="closest div[id]"
+          hx-swap="outerHTML"
+          class="text-[10px] font-mono px-2.5 py-1 rounded border transition-colors
+            {% if filter == f_val %}bg-blue-900/40 text-blue-400 border-blue-900/40{% else %}border-sentinel-border text-sentinel-muted hover:text-gray-200{% endif %}">
+    {{ f_label }}
+  </button>
+  {% endfor %}
+  <span class="text-[10px] font-mono text-sentinel-muted self-center ml-auto">{{ endpoints | length }} endpoints</span>
+</div>
+
+{% if not endpoints %}
+<div class="text-center py-10 text-sentinel-muted text-sm">No endpoints match this filter</div>
+{% else %}
+<div class="overflow-x-auto rounded-lg border border-sentinel-border" id="endpoints-wrap">
+  <table class="w-full text-xs font-mono">
+    <thead>
+      <tr class="border-b border-sentinel-border bg-sentinel-surface/50">
+        <th class="text-left px-3 py-2.5 text-sentinel-dim uppercase tracking-wider">Method</th>
+        <th class="text-left px-3 py-2.5 text-sentinel-dim uppercase tracking-wider">Path</th>
+        <th class="text-left px-3 py-2.5 text-sentinel-dim uppercase tracking-wider">Status</th>
+        <th class="text-left px-3 py-2.5 text-sentinel-dim uppercase tracking-wider">Auth</th>
+        <th class="text-left px-3 py-2.5 text-sentinel-dim uppercase tracking-wider">Rate Limit</th>
+        <th class="text-left px-3 py-2.5 text-sentinel-dim uppercase tracking-wider">TTFB</th>
+        <th class="text-left px-3 py-2.5 text-sentinel-dim uppercase tracking-wider">Risk</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ep in endpoints %}
+      <tr class="border-b border-sentinel-border last:border-b-0 hover:bg-sentinel-border/20
+                 {% if ep.endpoint_status in ('UNDOCUMENTED','INTERNAL') %}bg-red-900/5{% elif ep.endpoint_status == 'ZOMBIE' %}bg-purple-900/5{% endif %}">
+        <td class="px-3 py-2">
+          <span class="px-2 py-0.5 rounded text-[11px] font-bold {{ method_cls.get(ep.method, 'bg-gray-800 text-gray-400') }}">
+            {{ ep.method }}
+          </span>
+        </td>
+        <td class="px-3 py-2 text-gray-200 max-w-[260px] truncate">{{ ep.path }}</td>
+        <td class="px-3 py-2">
+          <span class="px-2 py-0.5 rounded text-[10px] {{ status_cls.get(ep.endpoint_status, 'bg-gray-800 text-gray-400') }}">
+            {{ ep.endpoint_status }}
+          </span>
+        </td>
+        <td class="px-3 py-2 {% if not ep.auth_required %}text-red-400{% else %}text-sentinel-muted{% endif %}">
+          {{ ep.auth_type or ('None' if not ep.auth_required else 'Required') }}
+        </td>
+        <td class="px-3 py-2 {% if not ep.has_rate_limit %}text-red-400{% else %}text-green-400{% endif %}">
+          {{ 'Present' if ep.has_rate_limit else 'None' }}
+        </td>
+        <td class="px-3 py-2 text-blue-400">{{ (ep.ttfb_ms // 1000000) if ep.ttfb_ms else '—' }}ms</td>
+        <td class="px-3 py-2">
+          <span class="px-2 py-0.5 rounded text-[10px] font-bold
+            {% if ep.risk_score >= 80 %}bg-red-900/40 text-red-400
+            {% elif ep.risk_score >= 60 %}bg-amber-900/40 text-amber-400
+            {% elif ep.risk_score >= 40 %}bg-purple-900/40 text-purple-400
+            {% elif ep.risk_score > 0 %}bg-green-900/40 text-green-400
+            {% else %}bg-gray-800 text-sentinel-muted{% endif %}">
+            {% if ep.risk_score > 0 %}{{ ep.risk_score }}{% else %}—{% endif %}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}

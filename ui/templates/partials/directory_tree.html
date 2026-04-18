@@ -1,0 +1,91 @@
+{% if not tree %}
+<div class="text-center py-10 text-sentinel-muted text-sm">Directory tree not available for this scan.</div>
+{% else %}
+<div class="space-y-2">
+  <!-- Root node -->
+  <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
+        </svg>
+        <span class="font-mono text-sm font-bold text-gray-100">ROOT/</span>
+        <span class="text-xs font-mono text-sentinel-muted">BuildDirectoryTree() → SentinelRank™</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-mono text-lg font-black
+          {% if score >= 80 %}text-green-400{% elif score >= 60 %}text-amber-400{% else %}text-red-400{% endif %}">
+          {{ score }}
+        </span>
+        <span class="text-xs text-sentinel-muted font-mono">/100</span>
+      </div>
+    </div>
+
+    <!-- Overall progress bar -->
+    <div class="bg-sentinel-border rounded-full h-2 overflow-hidden">
+      <div class="h-2 rounded-full transition-all duration-1000
+        {% if score >= 80 %}bg-green-500{% elif score >= 60 %}bg-amber-500{% else %}bg-red-500{% endif %}"
+        style="width: {{ score }}%"></div>
+    </div>
+  </div>
+
+  <!-- Child nodes -->
+  {% if tree.children %}
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+    {% for child in tree.children %}
+    {% set severity_colors = {
+      'CRITICAL': ('border-red-500/60', 'text-red-400', 'bg-red-500'),
+      'HIGH': ('border-amber-500/60', 'text-amber-400', 'bg-amber-500'),
+      'MEDIUM': ('border-purple-500/60', 'text-purple-400', 'bg-purple-500'),
+      'LOW': ('border-green-500/60', 'text-green-400', 'bg-green-500'),
+      'INFO': ('border-blue-500/40', 'text-blue-400', 'bg-blue-500'),
+    } %}
+    {% set border_cls, score_cls, bar_cls = severity_colors.get(child.severity | string, ('border-sentinel-border', 'text-sentinel-muted', 'bg-gray-500')) %}
+    <div class="bg-sentinel-surface border border-sentinel-border border-l-4 {{ border_cls }} rounded-lg p-3"
+         x-data="{ open: false }">
+      <div class="flex items-start justify-between mb-2 cursor-pointer" @click="open = !open">
+        <div>
+          <div class="font-mono text-xs font-bold text-gray-200">{{ child.path }}</div>
+          {% if child.findings %}
+          <div class="text-[10px] text-sentinel-muted font-mono mt-0.5">
+            {{ child.findings | length }} finding{{ 's' if child.findings | length != 1 else '' }}
+          </div>
+          {% endif %}
+        </div>
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <span class="font-mono text-sm font-bold {{ score_cls }}">{{ child.score }}</span>
+          {% if child.findings %}
+          <svg class="w-3.5 h-3.5 text-sentinel-muted transition-transform" :class="open ? 'rotate-180' : ''"
+               fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Score bar -->
+      <div class="bg-sentinel-border rounded-full h-1 overflow-hidden mb-2">
+        <div class="h-1 rounded-full transition-all duration-700 {{ bar_cls }}"
+             style="width: {{ child.score }}%"></div>
+      </div>
+
+      <!-- Finding titles (expanded) -->
+      {% if child.findings %}
+      <div x-show="open" x-collapse class="space-y-1 mt-2">
+        {% for f in child.findings %}
+        <div class="text-[10px] font-mono text-sentinel-muted flex items-center gap-1.5">
+          <span class="w-1 h-1 rounded-full flex-shrink-0
+            {% if f.severity == 'CRITICAL' %}bg-red-400
+            {% elif f.severity == 'HIGH' %}bg-amber-400
+            {% else %}bg-purple-400{% endif %}"></span>
+          <span class="truncate">{{ f.title }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}

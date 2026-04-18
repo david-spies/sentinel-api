@@ -1,0 +1,94 @@
+{% if status == 'error' %}
+<div class="bg-red-900/20 border border-red-900/40 rounded-lg p-3 text-xs font-mono text-red-400">
+  {{ error }}
+</div>
+{% else %}
+<div class="bg-sentinel-card border border-sentinel-border rounded-lg overflow-hidden" id="progress-card-{{ scan_id }}">
+  <div class="flex items-center justify-between px-4 py-3 border-b border-sentinel-border">
+    <div class="flex items-center gap-2 text-xs font-mono">
+      <span class="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse"></span>
+      <span class="text-blue-400">Scanning</span>
+      <span class="text-sentinel-muted">{{ target }}</span>
+    </div>
+    <span class="font-mono text-xs text-sentinel-dim">{{ scan_id }}</span>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="px-4 pt-3">
+    <div class="bg-sentinel-border rounded-full h-1.5 overflow-hidden mb-3">
+      <div id="prog-bar-{{ scan_id }}"
+           class="h-1.5 rounded-full bg-gradient-to-r from-blue-600 to-purple-500 transition-all duration-300"
+           style="width: 0%"></div>
+    </div>
+    <div id="prog-label-{{ scan_id }}" class="text-[10px] font-mono text-sentinel-muted mb-2">Initialising...</div>
+  </div>
+
+  <!-- Log stream -->
+  <div id="log-{{ scan_id }}"
+       class="px-4 pb-3 font-mono text-[10px] leading-relaxed h-32 overflow-y-auto space-y-0.5">
+  </div>
+
+  <!-- Done banner (hidden until complete) -->
+  <div id="done-{{ scan_id }}" class="hidden px-4 pb-3">
+    <a href="/results/{{ scan_id }}"
+       class="block w-full text-center py-2 bg-green-900/30 text-green-400 border border-green-900/40 text-xs font-semibold rounded hover:bg-green-900/50 transition-colors">
+      View Results →
+    </a>
+  </div>
+</div>
+
+<script>
+(function() {
+  const scanId = '{{ scan_id }}';
+  const logEl = document.getElementById('log-' + scanId);
+  const barEl = document.getElementById('prog-bar-' + scanId);
+  const lblEl = document.getElementById('prog-label-' + scanId);
+  const doneEl = document.getElementById('done-' + scanId);
+
+  const phaseProgress = {
+    fingerprint: 15, discovery: 40, analysis: 75, reporting: 90, complete: 100
+  };
+  const phaseColors = {
+    fingerprint: 'text-blue-400', discovery: 'text-cyan-400',
+    analysis: 'text-amber-400', reporting: 'text-purple-400',
+    complete: 'text-green-400', error: 'text-red-400'
+  };
+
+  const ws = new WebSocket('ws://' + location.host + '/ws/scan/' + scanId);
+
+  ws.onmessage = function(ev) {
+    let data;
+    try { data = JSON.parse(ev.data); } catch(e) { return; }
+
+    if (data.type === 'ping') return;
+    if (data.type === 'done' || data.phase === 'complete') {
+      barEl.style.width = '100%';
+      lblEl.textContent = 'Scan complete';
+      doneEl.classList.remove('hidden');
+      ws.close();
+      return;
+    }
+
+    const pct = phaseProgress[data.phase] || (data.total > 0 ? Math.round((data.done / data.total) * 100) : 50);
+    barEl.style.width = pct + '%';
+    lblEl.textContent = '[' + (data.phase || '').toUpperCase() + '] ' + (data.message || '');
+
+    const ts = new Date().toISOString().slice(11, 19);
+    const cls = phaseColors[data.phase] || 'text-sentinel-muted';
+    const line = document.createElement('div');
+    line.innerHTML = '<span class="text-sentinel-dim">' + ts + '</span> ' +
+                     '<span class="' + cls + '">[' + (data.phase || 'info').toUpperCase() + ']</span> ' +
+                     (data.message || '');
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  };
+
+  ws.onerror = function() {
+    const line = document.createElement('div');
+    line.className = 'text-red-400';
+    line.textContent = 'WebSocket connection error — check AI backend is running';
+    logEl.appendChild(line);
+  };
+})();
+</script>
+{% endif %}

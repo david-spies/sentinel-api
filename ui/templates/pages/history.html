@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% block title %}History{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-5">
+  <div>
+    <h1 class="text-lg font-bold">Scan History</h1>
+    <p class="text-xs text-sentinel-muted font-mono mt-0.5">{{ total }} total records</p>
+  </div>
+
+  <!-- Target filter -->
+  <form method="get" action="/history" class="flex gap-2 items-center">
+    <input type="text" name="target" value="{{ target }}" placeholder="Filter by target..."
+           class="bg-sentinel-surface border border-sentinel-border rounded px-3 py-1.5 text-xs font-mono text-gray-200 placeholder-sentinel-dim focus:outline-none focus:border-blue-500 w-64">
+    <button type="submit" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded hover:bg-blue-500">
+      Filter
+    </button>
+    {% if target %}
+    <a href="/history" class="px-3 py-1.5 text-xs text-sentinel-muted border border-sentinel-border rounded hover:text-gray-200">
+      Clear
+    </a>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Charts (only if target is set and we have trend data) -->
+{% if target and trend_data_json != '[]' %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+  <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4">
+    <div class="text-xs font-semibold text-gray-300 font-mono mb-3">SentinelRank Score Trend — {{ target }}</div>
+    <canvas id="trendChart" height="140"></canvas>
+  </div>
+  {% if owasp_data_json != '[]' %}
+  <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4">
+    <div class="text-xs font-semibold text-gray-300 font-mono mb-3">OWASP Coverage — {{ target }}</div>
+    <canvas id="owaspChart" height="140"></canvas>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- History table -->
+<div class="bg-sentinel-card border border-sentinel-border rounded-lg overflow-hidden">
+  <div class="px-4 py-3 border-b border-sentinel-border">
+    <div class="text-sm font-semibold">All Scans</div>
+  </div>
+  {% if entries %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-xs font-mono">
+      <thead>
+        <tr class="border-b border-sentinel-border">
+          <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Scan ID</th>
+          <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Target</th>
+          <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Score</th>
+          <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Critical</th>
+          <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">High</th>
+          <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Endpoints</th>
+          <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">Duration</th>
+          <th class="text-left px-4 py-2.5 text-sentinel-dim uppercase tracking-wider">When</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr class="border-b border-sentinel-border hover:bg-sentinel-border/20 cursor-pointer"
+            onclick="window.location='/results/{{ e.scan_id }}'">
+          <td class="px-4 py-2.5 text-blue-400">{{ e.scan_id }}</td>
+          <td class="px-4 py-2.5 text-gray-300 max-w-[220px] truncate">{{ e.target }}</td>
+          <td class="px-4 py-2.5">
+            <span class="px-2 py-0.5 rounded text-[11px] font-bold
+              {% if e.sentinel_rank_score >= 80 %}bg-green-900/40 text-green-400
+              {% elif e.sentinel_rank_score >= 60 %}bg-amber-900/40 text-amber-400
+              {% else %}bg-red-900/40 text-red-400{% endif %}">
+              {{ e.sentinel_rank_score }}
+            </span>
+          </td>
+          <td class="px-4 py-2.5 {% if e.critical > 0 %}text-red-400{% else %}text-sentinel-muted{% endif %}">{{ e.critical }}</td>
+          <td class="px-4 py-2.5 {% if e.high > 0 %}text-amber-400{% else %}text-sentinel-muted{% endif %}">{{ e.high }}</td>
+          <td class="px-4 py-2.5 text-sentinel-muted">{{ e.endpoint_count }}</td>
+          <td class="px-4 py-2.5 text-sentinel-muted">{{ e.duration }}</td>
+          <td class="px-4 py-2.5 text-sentinel-muted">{{ e.scanned_at | string | truncate(16, True, '') }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="px-4 py-10 text-center text-sentinel-muted text-sm">
+    {% if target %}No scans found for <span class="text-blue-400">{{ target }}</span>{% else %}No scan history yet{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const TREND = {{ trend_data_json | safe }};
+const OWASP = {{ owasp_data_json | safe }};
+
+if (TREND.length) {
+  new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: TREND.map(d => d.scanned_at.slice(0, 10)),
+      datasets: [{
+        label: 'SentinelRank Score',
+        data: TREND.map(d => d.score),
+        borderColor: '#60a5fa',
+        backgroundColor: 'rgba(96,165,250,0.08)',
+        tension: 0.3,
+        fill: true,
+        pointRadius: 3,
+        pointBackgroundColor: '#60a5fa',
+      }, {
+        label: 'Critical Findings',
+        data: TREND.map(d => d.critical),
+        borderColor: '#f87171',
+        backgroundColor: 'transparent',
+        tension: 0.3,
+        pointRadius: 3,
+        pointBackgroundColor: '#f87171',
+        yAxisID: 'y2',
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { color: '#5a6a84', font: { family: 'JetBrains Mono', size: 10 } } } },
+      scales: {
+        x: { ticks: { color: '#5a6a84', font: { family: 'JetBrains Mono', size: 9 } }, grid: { color: '#1c2538' } },
+        y: { ticks: { color: '#5a6a84', font: { family: 'JetBrains Mono', size: 9 } }, grid: { color: '#1c2538' }, min: 0, max: 100 },
+        y2: { position: 'right', ticks: { color: '#f87171', font: { family: 'JetBrains Mono', size: 9 } }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+if (OWASP.length) {
+  new Chart(document.getElementById('owaspChart'), {
+    type: 'bar',
+    data: {
+      labels: OWASP.map(d => d.category.split(' - ')[0]),
+      datasets: [{
+        label: 'Max Risk Score',
+        data: OWASP.map(d => d.max_risk),
+        backgroundColor: OWASP.map(d => d.max_risk >= 70 ? 'rgba(248,113,113,0.5)' : d.max_risk >= 40 ? 'rgba(251,191,36,0.5)' : 'rgba(52,211,153,0.5)'),
+        borderColor: OWASP.map(d => d.max_risk >= 70 ? '#f87171' : d.max_risk >= 40 ? '#fbbf24' : '#34d399'),
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#5a6a84', font: { family: 'JetBrains Mono', size: 9 } }, grid: { color: '#1c2538' } },
+        y: { ticks: { color: '#5a6a84', font: { family: 'JetBrains Mono', size: 9 } }, grid: { color: '#1c2538' }, min: 0, max: 100 }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

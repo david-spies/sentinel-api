@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}New Scan{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+  <h1 class="text-lg font-bold mb-1">New Scan</h1>
+  <p class="text-xs text-sentinel-muted font-mono mb-5">Configure and launch a Sentinel-API security scan</p>
+
+  <form hx-post="/partials/scan/start"
+        hx-target="#progress-panel"
+        hx-swap="innerHTML"
+        hx-indicator="#launch-spinner"
+        class="space-y-4">
+
+    <!-- Target -->
+    <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4 space-y-3">
+      <div class="text-xs font-semibold text-gray-300 uppercase tracking-wider font-mono">Target</div>
+      <div>
+        <label class="block text-xs text-sentinel-muted mb-1">API Base URL <span class="text-red-400">*</span></label>
+        <input type="text" name="target" required placeholder="https://api.example.com"
+               class="w-full bg-sentinel-surface border border-sentinel-border rounded px-3 py-2.5 text-sm font-mono text-gray-200 placeholder-sentinel-dim focus:outline-none focus:border-blue-500">
+      </div>
+      <div>
+        <label class="block text-xs text-sentinel-muted mb-1">OpenAPI Spec URL <span class="text-sentinel-dim">(enables schema-diff shadow detection)</span></label>
+        <input type="text" name="openapi" placeholder="https://api.example.com/openapi.json"
+               class="w-full bg-sentinel-surface border border-sentinel-border rounded px-3 py-2.5 text-sm font-mono text-gray-200 placeholder-sentinel-dim focus:outline-none focus:border-blue-500">
+      </div>
+    </div>
+
+    <!-- Authentication -->
+    <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4 space-y-3">
+      <div class="text-xs font-semibold text-gray-300 uppercase tracking-wider font-mono">Authentication</div>
+      <div>
+        <label class="block text-xs text-sentinel-muted mb-1">Bearer Token</label>
+        <input type="password" name="token" placeholder="eyJhbGciOiJSUzI1NiJ9..."
+               class="w-full bg-sentinel-surface border border-sentinel-border rounded px-3 py-2.5 text-xs font-mono text-gray-200 placeholder-sentinel-dim focus:outline-none focus:border-blue-500">
+      </div>
+    </div>
+
+    <!-- Scan modules -->
+    <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4">
+      <div class="text-xs font-semibold text-gray-300 uppercase tracking-wider font-mono mb-3">Scan Modules</div>
+      <div class="grid grid-cols-2 gap-2">
+        {% set modules = [
+          ('nvd_lookup', 'nvd_lookup', 'NVD CVE Lookup', 'Live NVD API 2.0 CVE enrichment', False),
+          ('no_owasp', 'no_owasp', 'Skip OWASP', 'Disable OWASP Top 10 checks', False),
+          ('no_pii', 'no_pii', 'Skip PII', 'Disable PII pattern scanning', False),
+        ] %}
+        {% for id, name, label, desc, checked in modules %}
+        <label class="flex items-start gap-2 p-2 rounded bg-sentinel-surface border border-sentinel-border cursor-pointer hover:border-sentinel-border2 transition-colors">
+          <input type="checkbox" name="{{ name }}" value="1" {% if checked %}checked{% endif %}
+                 class="mt-0.5 accent-blue-500 flex-shrink-0">
+          <div>
+            <div class="text-xs font-semibold text-gray-200">{{ label }}</div>
+            <div class="text-[10px] text-sentinel-muted font-mono">{{ desc }}</div>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Performance -->
+    <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4">
+      <div class="text-xs font-semibold text-gray-300 uppercase tracking-wider font-mono mb-3">Performance</div>
+      <div>
+        <label class="block text-xs text-sentinel-muted mb-1">Concurrency <span class="font-mono text-blue-400" id="concurrency-val">25</span> workers</label>
+        <input type="range" name="concurrency" min="5" max="100" value="25"
+               oninput="document.getElementById('concurrency-val').textContent=this.value"
+               class="w-full accent-blue-500">
+        <div class="flex justify-between text-[10px] text-sentinel-dim font-mono mt-1">
+          <span>5 (cautious)</span><span>50 (standard)</span><span>100 (aggressive)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Launch -->
+    <button type="submit"
+            class="w-full py-3 bg-blue-600 text-white font-bold rounded hover:bg-blue-500 transition-colors flex items-center justify-center gap-2">
+      <svg id="launch-spinner" class="animate-spin w-4 h-4 htmx-indicator" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      &#9654;&nbsp; Launch Scan
+    </button>
+  </form>
+
+  <!-- Progress panel (HTMX target) -->
+  <div id="progress-panel" class="mt-4"></div>
+</div>
+{% endblock %}

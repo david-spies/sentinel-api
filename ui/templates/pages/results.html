@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Results {{ scan_id }}{% endblock %}
+
+{% block content %}
+<!-- Results header — loaded immediately, data lazy-loaded via HTMX -->
+<div hx-get="/partials/techstack/{{ scan_id }}"
+     hx-trigger="load"
+     hx-swap="outerHTML">
+  <!-- Skeleton -->
+  <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4 mb-4 animate-pulse">
+    <div class="h-4 w-48 bg-sentinel-border rounded mb-2"></div>
+    <div class="h-3 w-32 bg-sentinel-border rounded"></div>
+  </div>
+</div>
+
+<!-- Tab bar -->
+<div class="flex gap-0 border-b border-sentinel-border mb-4 overflow-x-auto" id="tab-bar">
+  {% set tabs = [
+    ('findings',   'Findings',     'bg-red-900/40 text-red-400'),
+    ('endpoints',  'Endpoints',    'bg-amber-900/40 text-amber-400'),
+    ('owasp',      'OWASP Top 10', 'bg-blue-900/40 text-blue-400'),
+    ('shadow',     'Shadow APIs',  'bg-red-900/40 text-red-400'),
+    ('cves',       'CVE / NVD',    'bg-purple-900/40 text-purple-400'),
+    ('ratelimit',  'Rate Probes',  'bg-amber-900/40 text-amber-400'),
+    ('directory',  'Directory',    'bg-blue-900/40 text-blue-400'),
+  ] %}
+  {% for tab_id, label, badge_cls in tabs %}
+  <button onclick="showTab('{{ tab_id }}')"
+          id="tab-{{ tab_id }}"
+          class="px-4 py-2.5 text-xs font-semibold border-b-2 transition-all whitespace-nowrap
+                 border-transparent text-sentinel-muted hover:text-gray-200">
+    {{ label }}
+  </button>
+  {% endfor %}
+</div>
+
+<!-- Tab panels — each loads its partial on first activation -->
+{% for tab_id in ['findings','endpoints','owasp','shadow','cves','ratelimit','directory'] %}
+<div id="panel-{{ tab_id }}" class="tab-panel hidden">
+  <div hx-get="/partials/{{ tab_id }}/{{ scan_id }}"
+       hx-trigger="revealed"
+       hx-swap="outerHTML"
+       hx-indicator="#spinner-{{ tab_id }}">
+    <div class="flex items-center gap-2 text-xs text-sentinel-muted font-mono py-6">
+      <svg id="spinner-{{ tab_id }}" class="animate-spin w-4 h-4 htmx-indicator" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      Loading {{ tab_id }}...
+    </div>
+  </div>
+</div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Activate first tab on load
+document.addEventListener('DOMContentLoaded', () => showTab('findings'));
+</script>
+{% endblock %}

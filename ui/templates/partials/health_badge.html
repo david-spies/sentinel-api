@@ -1,0 +1,17 @@
+<span hx-get="/partials/health"
+      hx-trigger="every 10s"
+      hx-swap="outerHTML"
+      class="flex items-center gap-1.5">
+  <span class="w-1.5 h-1.5 rounded-full
+    {% if health.status == 'ok' %}bg-green-400 shadow-[0_0_6px_#34d399]
+    {% elif health.status == 'starting' %}bg-amber-400 shadow-[0_0_6px_#fbbf24]
+    {% else %}bg-red-400{% endif %}
+    animate-pulse"></span>
+  <span class="{% if health.status == 'ok' %}text-green-400{% elif health.status == 'starting' %}text-amber-400{% else %}text-red-400{% endif %}">
+    {{ health.status }}
+  </span>
+  {% if health.model_name and health.model_name != '—' %}
+  <span class="text-sentinel-dim">·</span>
+  <span>{{ health.model_name | truncate(20, True, '…') }}</span>
+  {% endif %}
+</span>

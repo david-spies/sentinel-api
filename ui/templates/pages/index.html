@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="flex items-center justify-between mb-5">
+  <div>
+    <h1 class="text-lg font-bold">Dashboard</h1>
+    <p class="text-xs text-sentinel-muted font-mono mt-0.5">Sentinel-API security scanner — overview</p>
+  </div>
+  <a href="/scan"
+     class="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded hover:bg-blue-500 transition-colors">
+    &#9654;&nbsp; New Scan
+  </a>
+</div>
+
+<!-- Service status cards -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+  <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4">
+    <div class="text-[10px] font-mono font-semibold tracking-widest text-sentinel-muted uppercase mb-2">AI Service</div>
+    <div class="text-xl font-bold
+      {% if health.status == 'ok' %}text-green-400
+      {% elif health.status == 'starting' %}text-amber-400
+      {% else %}text-red-400{% endif %}">
+      {{ health.status | upper }}
+    </div>
+    <div class="text-[11px] text-sentinel-muted font-mono mt-1">{{ health.model_name or '—' }}</div>
+  </div>
+  <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4">
+    <div class="text-[10px] font-mono font-semibold tracking-widest text-sentinel-muted uppercase mb-2">Model Loaded</div>
+    <div class="text-xl font-bold {% if health.model_loaded %}text-green-400{% else %}text-amber-400{% endif %}">
+      {{ 'Ready' if health.model_loaded else 'Loading' }}
+    </div>
+    <div class="text-[11px] text-sentinel-muted font-mono mt-1">Mistral-7B-Instruct</div>
+  </div>
+  <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4">
+    <div class="text-[10px] font-mono font-semibold tracking-widest text-sentinel-muted uppercase mb-2">Uptime</div>
+    <div class="text-xl font-bold text-blue-400">
+      {% set u = health.uptime_s | int %}
+      {% if u < 60 %}{{ u }}s
+      {% elif u < 3600 %}{{ (u // 60) }}m
+      {% else %}{{ (u // 3600) }}h{% endif %}
+    </div>
+    <div class="text-[11px] text-sentinel-muted font-mono mt-1">AI backend</div>
+  </div>
+  <div class="bg-sentinel-card border border-sentinel-border rounded-lg p-4">
+    <div class="text-[10px] font-mono font-semibold tracking-widest text-sentinel-muted uppercase mb-2">Total Scans</div>
+    <div class="text-xl font-bold text-purple-400">{{ recent_scans | length }}</div>
+    <div class="text-[11px] text-sentinel-muted font-mono mt-1">recent records</div>
+  </div>
+</div>
+
+<!-- Recent scans + quick actions -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+  <!-- Recent scans table -->
+  <div class="lg:col-span-2 bg-sentinel-card border border-sentinel-border rounded-lg overflow-hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-sentinel-border">
+      <div class="text-sm font-semibold">Recent Scans</div>
+      <a href="/history" class="text-xs text-blue-400 hover:text-blue-300">View all →</a>
+    </div>
+    {% if recent_scans %}
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs font-mono">
+        <thead>
+          <tr class="border-b border-sentinel-border">
+            <th class="text-left px-4 py-2 text-sentinel-dim uppercase tracking-wider">Scan ID</th>
+            <th class="text-left px-4 py-2 text-sentinel-dim uppercase tracking-wider">Target</th>
+            <th class="text-left px-4 py-2 text-sentinel-dim uppercase tracking-wider">Score</th>
+            <th class="text-left px-4 py-2 text-sentinel-dim uppercase tracking-wider">Critical</th>
+            <th class="text-left px-4 py-2 text-sentinel-dim uppercase tracking-wider">When</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in recent_scans %}
+          <tr class="border-b border-sentinel-border hover:bg-sentinel-border/20 cursor-pointer"
+              onclick="window.location='/results/{{ entry.scan_id }}'">
+            <td class="px-4 py-2.5 text-blue-400">{{ entry.scan_id }}</td>
+            <td class="px-4 py-2.5 text-gray-300 max-w-[180px] truncate">{{ entry.target }}</td>
+            <td class="px-4 py-2.5">
+              <span class="px-2 py-0.5 rounded text-[11px] font-bold
+                {% if entry.sentinel_rank_score >= 80 %}bg-green-900/40 text-green-400
+                {% elif entry.sentinel_rank_score >= 60 %}bg-amber-900/40 text-amber-400
+                {% else %}bg-red-900/40 text-red-400{% endif %}">
+                {{ entry.sentinel_rank_score }}/100
+              </span>
+            </td>
+            <td class="px-4 py-2.5 {% if entry.critical > 0 %}text-red-400{% else %}text-sentinel-muted{% endif %}">
+              {{ entry.critical }}
+            </td>
+            <td class="px-4 py-2.5 text-sentinel-muted">{{ entry.scanned_at | string | truncate(16, True, '') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="px-4 py-10 text-center text-sentinel-muted text-sm">
+      <div class="text-2xl mb-2">◎</div>
+      No scans yet — <a href="/scan" class="text-blue-400 hover:underline">run your first scan</a>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Quick scan panel -->
+  <div class="bg-sentinel-card border border-sentinel-border rounded-lg overflow-hidden">
+    <div class="px-4 py-3 border-b border-sentinel-border">
+      <div class="text-sm font-semibold">Quick Scan</div>
+    </div>
+    <div class="p-4">
+      <form hx-post="/partials/scan/start"
+            hx-target="#scan-progress-container"
+            hx-swap="innerHTML"
+            hx-indicator="#scan-spinner"
+            class="space-y-3">
+        <div>
+          <label class="block text-[10px] font-mono text-sentinel-muted uppercase tracking-wider mb-1">Target URL</label>
+          <input type="text" name="target" required placeholder="https://api.example.com"
+                 class="w-full bg-sentinel-surface border border-sentinel-border rounded px-3 py-2 text-sm font-mono text-gray-200 placeholder-sentinel-dim focus:outline-none focus:border-blue-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-mono text-sentinel-muted uppercase tracking-wider mb-1">Bearer Token (optional)</label>
+          <input type="text" name="token" placeholder="eyJhbGci..."
+                 class="w-full bg-sentinel-surface border border-sentinel-border rounded px-3 py-2 text-xs font-mono text-gray-200 placeholder-sentinel-dim focus:outline-none focus:border-blue-500">
+        </div>
+        <div class="flex gap-3 flex-wrap">
+          <label class="flex items-center gap-1.5 text-xs text-sentinel-muted cursor-pointer">
+            <input type="checkbox" name="nvd_lookup" value="1" class="accent-blue-500"> NVD Lookup
+          </label>
+          <label class="flex items-center gap-1.5 text-xs text-sentinel-muted cursor-pointer">
+            <input type="checkbox" name="no_owasp" value="1" class="accent-blue-500"> Skip OWASP
+          </label>
+        </div>
+        <button type="submit"
+                class="w-full py-2 bg-red-900/40 text-red-400 border border-red-900/40 text-sm font-semibold rounded hover:bg-red-900/60 transition-colors flex items-center justify-center gap-2">
+          <span class="htmx-indicator" id="scan-spinner">
+            <svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+          </span>
+          Scan
+        </button>
+      </form>
+      <div id="scan-progress-container" class="mt-3"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

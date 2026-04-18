@@ -1,0 +1,115 @@
+{% if not cves %}
+<div class="text-center py-10 text-sentinel-muted text-sm">
+  <div class="text-2xl mb-2 text-green-400">✓</div>
+  No CVE findings — either no vulnerabilities detected or NVD lookup was not enabled.
+  <div class="mt-2 text-xs font-mono">
+    Enable with: <span class="text-blue-400">--nvd-lookup</span>
+    (optionally <span class="text-blue-400">--nvd-api-key YOUR_KEY</span> for 50 req/30s)
+  </div>
+</div>
+{% else %}
+<div class="mb-3 flex items-center gap-3 flex-wrap">
+  <span class="text-xs text-sentinel-muted font-mono">{{ cves | length }} CVEs · source:
+    {% set has_live = cves | selectattr('source', 'equalto', 'nvd_api') | list | length > 0 %}
+    {% if has_live %}
+    <span class="text-blue-400">NVD API 2.0 (live)</span>
+    {% else %}
+    <span class="text-sentinel-muted">static fallback table</span>
+    {% endif %}
+  </span>
+  {% set kev_count = cves | selectattr('exploited') | list | length %}
+  {% if kev_count > 0 %}
+  <span class="text-[11px] font-mono px-2 py-0.5 rounded bg-red-900/40 text-red-400 animate-pulse">
+    ⚠ {{ kev_count }} CISA KEV
+  </span>
+  {% endif %}
+</div>
+
+<div class="space-y-3">
+{% for cve in cves %}
+{% set is_kev = cve.exploited %}
+{% set score = cve.cvss.base_score if cve.cvss else 0 %}
+{% set sev = cve.cvss.base_sever if cve.cvss else 'UNKNOWN' %}
+{% set border = 'border-l-red-500/70' if score >= 9 else ('border-l-amber-500/60' if score >= 7 else 'border-l-yellow-600/50') %}
+<div class="bg-sentinel-surface border border-sentinel-border border-l-4 {{ border }} rounded-lg p-4"
+     x-data="{ open: false }">
+
+  <!-- Header row -->
+  <div class="flex items-start justify-between gap-3 cursor-pointer" @click="open = !open">
+    <div class="min-w-0">
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-sm font-bold font-mono text-gray-100">{{ cve.id }}</span>
+        {% if is_kev %}
+        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-red-900/50 text-red-400 border border-red-900/60 font-bold">
+          ⚠ CISA KEV{% if cve.exploited_date %} · {{ cve.exploited_date | string | truncate(10, True, '') }}{% endif %}
+        </span>
+        {% endif %}
+        <span class="text-[10px] font-mono px-1.5 py-0.5 rounded
+          {% if sev == 'CRITICAL' %}bg-red-900/30 text-red-400
+          {% elif sev == 'HIGH' %}bg-amber-900/30 text-amber-400
+          {% elif sev == 'MEDIUM' %}bg-yellow-900/30 text-yellow-400
+          {% else %}bg-gray-800 text-gray-400{% endif %}">
+          CVSS {{ '%.1f' | format(score) }} {{ sev }}
+        </span>
+        <span class="text-[10px] font-mono text-sentinel-dim">
+          {% if cve.source == 'nvd_api' %}NVD live{% elif cve.source == 'cache' %}NVD cache{% else %}static fallback{% endif %}
+        </span>
+      </div>
+      {% if cve.description %}
+      <div class="text-xs text-sentinel-muted mt-1 leading-relaxed line-clamp-2">{{ cve.description }}</div>
+      {% endif %}
+    </div>
+    <svg class="w-4 h-4 text-sentinel-muted flex-shrink-0 transition-transform mt-0.5" :class="open ? 'rotate-180' : ''"
+         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    </svg>
+  </div>
+
+  <!-- Expanded detail -->
+  <div x-show="open" x-collapse class="mt-3 space-y-3">
+    {% if cve.description %}
+    <p class="text-xs text-gray-300 leading-relaxed">{{ cve.description }}</p>
+    {% endif %}
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {% set meta = [
+        ('CVSS Version', cve.cvss.version if cve.cvss else '—'),
+        ('Vector', cve.cvss.vector_string if cve.cvss else '—'),
+        ('Published', cve.published | string | truncate(10, True, '') if cve.published else '—'),
+        ('Last Modified', cve.last_modified | string | truncate(10, True, '') if cve.last_modified else '—'),
+      ] %}
+      {% for label, value in meta %}
+      <div>
+        <div class="text-[9px] font-mono text-sentinel-dim uppercase tracking-widest">{{ label }}</div>
+        <div class="text-xs font-mono text-gray-300 mt-0.5 break-all">{{ value }}</div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if cve.cwes %}
+    <div>
+      <div class="text-[9px] font-mono text-sentinel-dim uppercase tracking-widest mb-1">CWEs</div>
+      <div class="flex flex-wrap gap-1">
+        {% for cwe in cve.cwes %}
+        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sentinel-border text-sentinel-muted">{{ cwe }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if cve.references %}
+    <div>
+      <div class="text-[9px] font-mono text-sentinel-dim uppercase tracking-widest mb-1">References</div>
+      <div class="space-y-0.5">
+        {% for ref in cve.references %}
+        <a href="{{ ref }}" target="_blank" rel="noopener"
+           class="block text-[10px] font-mono text-blue-400 hover:text-blue-300 truncate">{{ ref }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}

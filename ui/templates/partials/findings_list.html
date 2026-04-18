@@ -1,0 +1,84 @@
+{% if not findings %}
+<div class="text-center py-12 text-sentinel-muted text-sm">
+  <div class="text-3xl mb-2 text-green-400">✓</div>
+  No findings in this scan
+</div>
+{% else %}
+<div class="mb-3 flex items-center gap-3 flex-wrap">
+  <span class="text-xs text-sentinel-muted font-mono">{{ findings | length }} findings</span>
+  {% set counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0} %}
+  {% for f in findings %}{% set _ = counts.update({f.severity: counts.get(f.severity, 0) + 1}) %}{% endfor %}
+  {% for sev, cls in [('CRITICAL','bg-red-900/40 text-red-400'), ('HIGH','bg-amber-900/40 text-amber-400'), ('MEDIUM','bg-purple-900/40 text-purple-400'), ('LOW','bg-green-900/40 text-green-400')] %}
+  {% if counts[sev] > 0 %}
+  <span class="text-[11px] font-mono px-2 py-0.5 rounded {{ cls }}">{{ counts[sev] }} {{ sev }}</span>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<div class="space-y-3">
+{% for f in findings %}
+{% set border = 'border-red-500/60' if f.severity == 'CRITICAL' else ('border-amber-500/60' if f.severity == 'HIGH' else ('border-purple-500/60' if f.severity == 'MEDIUM' else 'border-green-500/40')) %}
+<div class="bg-sentinel-surface border border-sentinel-border border-l-4 {{ border }} rounded-lg p-4"
+     x-data="{ open: false }">
+  <!-- Finding header -->
+  <div class="flex items-start justify-between gap-3 cursor-pointer" @click="open = !open">
+    <div class="min-w-0">
+      <div class="text-sm font-semibold text-gray-100 leading-snug">{{ f.title }}</div>
+      <div class="text-[10px] font-mono text-sentinel-muted mt-1">
+        {{ f.id }} · {{ f.owasp_category }} · CVSS {{ f.cvss_score }}
+        {% if f.endpoint %} · {{ f.endpoint.method }} {{ f.endpoint.path }}{% endif %}
+      </div>
+    </div>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <span class="text-[11px] font-mono font-bold px-2 py-0.5 rounded
+        {% if f.severity == 'CRITICAL' %}bg-red-900/40 text-red-400
+        {% elif f.severity == 'HIGH' %}bg-amber-900/40 text-amber-400
+        {% elif f.severity == 'MEDIUM' %}bg-purple-900/40 text-purple-400
+        {% else %}bg-green-900/40 text-green-400{% endif %}">
+        {{ f.severity }}
+      </span>
+      <span class="text-xs font-mono text-sentinel-muted">{{ f.risk_score }}/100</span>
+      <svg class="w-4 h-4 text-sentinel-muted transition-transform" :class="open ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Expanded detail -->
+  <div x-show="open" x-collapse class="mt-3 space-y-3">
+    <p class="text-xs text-gray-300 leading-relaxed">{{ f.description }}</p>
+
+    {% if f.evidence %}
+    <div>
+      <div class="text-[9px] font-mono text-sentinel-dim uppercase tracking-widest mb-1">Evidence</div>
+      <pre class="bg-sentinel-bg border border-sentinel-border rounded p-3 text-[11px] font-mono text-amber-300 overflow-x-auto whitespace-pre-wrap">{{ f.evidence }}</pre>
+    </div>
+    {% endif %}
+
+    {% if f.remediation %}
+    <div>
+      <div class="text-[9px] font-mono text-green-400 uppercase tracking-widest mb-1">AI Remediation · reporter.go → pushToAIBackend()</div>
+      <div class="bg-sentinel-bg border border-sentinel-border rounded p-3">
+        {% set parts = f.remediation.split('```') %}
+        {% if parts | length > 1 %}
+          <p class="text-xs text-gray-300 mb-2">{{ parts[0] | trim }}</p>
+          <pre class="text-[11px] font-mono text-cyan-300 overflow-x-auto whitespace-pre-wrap">{{ parts[1] | replace('\n', '', 1) if parts[1].startswith('\n') else parts[1] }}</pre>
+        {% else %}
+          <p class="text-xs text-gray-300">{{ f.remediation }}</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if f.tags %}
+    <div class="flex flex-wrap gap-1">
+      {% for tag in f.tags %}
+      <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-sentinel-border text-sentinel-muted">{{ tag }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+</div>
+{% endif %}

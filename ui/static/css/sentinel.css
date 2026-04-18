@@ -1,0 +1,119 @@
+/* Sentinel-API Dashboard — custom styles */
+/* Tailwind handles layout; this file adds only what Tailwind cannot: */
+/* CSS animations, Alpine.js collapse, custom scrollbar, scan log colours */
+
+/* ── Alpine collapse transition ─────────────────────────────────────── */
+[x-cloak] { display: none !important; }
+
+/* Smooth collapse for Alpine x-collapse directive */
+[x-collapse] {
+  overflow: hidden;
+  transition: height 0.25s ease, opacity 0.25s ease;
+}
+
+/* ── Pulsing status dot ──────────────────────────────────────────────── */
+@keyframes sentinel-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 currentColor; }
+  50%       { opacity: 0.6; box-shadow: 0 0 6px 2px currentColor; }
+}
+.status-dot { animation: sentinel-pulse 2s ease-in-out infinite; }
+
+/* ── Scan log stream ─────────────────────────────────────────────────── */
+.log-stream {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  line-height: 1.65;
+  scrollbar-width: thin;
+  scrollbar-color: #1c2538 #090d14;
+}
+.log-stream .log-ts    { color: #2e3d55; }
+.log-stream .log-ok    { color: #34d399; }
+.log-stream .log-err   { color: #f87171; }
+.log-stream .log-warn  { color: #fbbf24; }
+.log-stream .log-info  { color: #60a5fa; }
+
+/* ── Score ring SVG ──────────────────────────────────────────────────── */
+.score-ring circle {
+  transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Progress bar shimmer ────────────────────────────────────────────── */
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.progress-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+.progress-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(96,165,250,0.15), transparent);
+  animation: shimmer 1.5s ease-in-out infinite;
+  width: 30%;
+}
+
+/* ── HTMX loading fade ───────────────────────────────────────────────── */
+.htmx-swapping { opacity: 0; transition: opacity 150ms ease; }
+.htmx-settling  { opacity: 1; transition: opacity 150ms ease; }
+
+/* ── Table hover highlight ───────────────────────────────────────────── */
+tbody tr { transition: background-color 120ms ease; }
+
+/* ── Finding card expand ─────────────────────────────────────────────── */
+.finding-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+.finding-body.open { max-height: 600px; }
+
+/* ── Sidebar active pill ─────────────────────────────────────────────── */
+.nav-active {
+  color: #60a5fa;
+  background: #131a27;
+  border-left-color: #60a5fa;
+}
+
+/* ── Tooltip ─────────────────────────────────────────────────────────── */
+[data-tip] { position: relative; cursor: help; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1c2538;
+  color: #dde5f0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms;
+  border: 1px solid #283349;
+  z-index: 100;
+}
+[data-tip]:hover::after { opacity: 1; }
+
+/* ── Code block scrollbar ────────────────────────────────────────────── */
+pre::-webkit-scrollbar { height: 3px; }
+pre::-webkit-scrollbar-track { background: transparent; }
+pre::-webkit-scrollbar-thumb { background: #283349; border-radius: 2px; }
+
+/* ── Tab underline animation ─────────────────────────────────────────── */
+.tab-active {
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
+}
+
+/* ── CVE KEV pulse badge ─────────────────────────────────────────────── */
+@keyframes kev-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0.4); }
+  50%       { box-shadow: 0 0 8px 3px rgba(248,113,113,0.2); }
+}
+.kev-badge { animation: kev-pulse 2s ease-in-out infinite; }
